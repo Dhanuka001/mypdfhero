@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const links = [
@@ -9,11 +10,25 @@ const links = [
 export function Navbar() {
   return (
     <header className="sticky top-0 z-20 border-b border-purple-100/80 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Link href="/" className="text-2xl font-black tracking-tight text-[#120529]">
-          MyPDFHero
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 ">
+        <Link
+          href="/"
+          className="flex items-center gap-2 md:gap-2.5"
+        >
+          <Image
+            src="/mypdfhero_logo.png"
+            alt="MyPDFHero logo"
+            width={90}
+            height={90}
+            className="h-16 w-16 md:h-28 md:w-28"
+          />
+          <span className="text-lg font-semibold tracking-tight text-[#120529] md:text-xl">
+            MyPDFHero
+          </span>
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold md:flex">
+
+        {/* Center Nav (desktop) */}
+        <nav className="hidden flex-1 items-center justify-center gap-6 text-md font-medium md:flex">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -24,12 +39,16 @@ export function Navbar() {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/"
-          className="rounded-full bg-[#7c3aed] px-5 py-2 text-sm font-bold text-white shadow-lg shadow-purple-200 transition hover:bg-[#6931c9]"
-        >
-          Free & Secure
-        </Link>
+
+        {/* Right CTA */}
+        <div className="flex shrink-0 items-center">
+          <Link
+            href="/"
+            className="rounded-full bg-[#7c3aed] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-purple-200 transition hover:bg-[#6931c9] md:px-5 md:text-sm"
+          >
+            Free & Secure
+          </Link>
+        </div>
       </div>
     </header>
   );

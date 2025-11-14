@@ -1,16 +1,23 @@
+import type { Metadata } from "next";
 import { ToolPageTemplate } from "@/components/ToolPageTemplate";
+
+export const metadata: Metadata = {
+  title: "Convert JPG or PNG to PDF | MyPDFHero",
+  description: "Turn receipts, photos, and whiteboard snapshots into a neat PDF packet with perfect page sizing.",
+};
 
 export default function JpgToPdfPage() {
   return (
     <ToolPageTemplate
       title="JPG to PDF"
-      description="Turn photos, scans, and screenshots into a clean PDF pack with proper margins."
+      description="Turn images and scans into a single PDF that is easy to store, sign, or share."
       endpoint="/api/pdf/jpg-to-pdf"
-      steps={[
-        "Upload up to 10 JPG or PNG images.",
-        "We align, rotate, and compress the images for print-ready clarity.",
-        "Save the freshly generated PDF to your device.",
-      ]}
+      fieldName="images"
+      accept="image/jpeg,image/png"
+      helperText="Drop JPG or PNG files (up to 10 at a time). We keep your upload order so pages stay organized."
+      primaryActionLabel="Convert to PDF"
+      multiple
+      maxFiles={10}
     />
   );
 }
