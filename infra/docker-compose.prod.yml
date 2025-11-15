@@ -9,6 +9,8 @@ services:
       NODE_ENV: production
       PORT: 4000
       FRONTEND_ORIGIN: "https://mypdfhero.com"
+    ports:
+      - "4000:4000"
     networks:
       - web
 
@@ -21,30 +23,11 @@ services:
       NEXT_PUBLIC_API_URL: "https://mypdfhero.com"
     depends_on:
       - backend
-    networks:
-      - web
-
-  caddy:
-    image: caddy:2.8
-    restart: unless-stopped
-    depends_on:
-      - frontend
-      - backend
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - "3000:3000"
     networks:
       - web
 
 networks:
   web:
     driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:
-
