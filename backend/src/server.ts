@@ -18,6 +18,12 @@ const MAX_FILES_PER_REQUEST = 10;
 const GHOSTSCRIPT_BINARY = process.env.GHOSTSCRIPT_PATH || (process.platform === "win32" ? "gswin64c" : "gs");
 const GHOSTSCRIPT_INSTALL_HELP =
   "Install Ghostscript (macOS: `brew install ghostscript`, Debian/Ubuntu: `sudo apt-get install ghostscript`, RHEL/CentOS: `sudo yum install ghostscript`) or set GHOSTSCRIPT_PATH.";
+const MIN_BYTES_FOR_GHOSTSCRIPT = Number(process.env.MIN_BYTES_FOR_GHOSTSCRIPT ?? 512 * 1024); // 0.5MB
+const GOOD_COMPRESSION_THRESHOLD = Number(process.env.GOOD_COMPRESSION_THRESHOLD ?? 0.35); // 35%
+const TARGET_COMPRESSED_SIZE_BYTES =
+  Number(process.env.TARGET_COMPRESSED_SIZE_BYTES ?? 3 * 1024 * 1024); // 3MB
+const MIN_INCREMENTAL_GAIN_AFTER_FIRST = Number(process.env.MIN_INCREMENTAL_GAIN_AFTER_FIRST ?? 0.04); // 4%
+const GHOSTSCRIPT_TIMEOUT_MS = Number(process.env.GHOSTSCRIPT_TIMEOUT_MS ?? 25_000);
 const GHOSTSCRIPT_PRESETS: { name: string; args: string[] }[] = [
   { name: "screen", args: ["-dPDFSETTINGS=/screen"] },
   { name: "ebook", args: ["-dPDFSETTINGS=/ebook"] },
@@ -261,6 +267,11 @@ function validateImage(file: Express.Multer.File) {
 /* -------------------------------------------------------------------------- */
 
 async function compressPdfBuffer(buffer: Buffer): Promise<Buffer> {
+  if (buffer.length <= MIN_BYTES_FOR_GHOSTSCRIPT) {
+    // Very small files usually don't benefit from another PDF rewrite.
+    return buffer;
+  }
+
   try {
     return await compressPdfWithGhostscript(buffer);
   } catch (error) {
@@ -283,15 +294,28 @@ async function compressPdfWithGhostscript(inputBuffer: Buffer): Promise<Buffer> 
 
   let bestBuffer = inputBuffer;
   let bestSize = inputBuffer.length;
+  let previousBestSize = inputBuffer.length;
 
   try {
-    for (const preset of GHOSTSCRIPT_PRESETS) {
+    for (const [index, preset] of GHOSTSCRIPT_PRESETS.entries()) {
       const outputPath = path.join(tmpDir, `output-${preset.name}.pdf`);
-      await runGhostscriptPreset(preset.args, inputPath, outputPath);
+      await runGhostscriptPreset(preset.args, inputPath, outputPath, { timeoutMs: GHOSTSCRIPT_TIMEOUT_MS });
       const candidate = await fs.readFile(outputPath);
       if (candidate.length < bestSize) {
+        const incrementalGain =
+          previousBestSize > 0 ? (previousBestSize - candidate.length) / previousBestSize : 0;
+        previousBestSize = candidate.length;
+
         bestBuffer = candidate;
         bestSize = candidate.length;
+
+        if (
+          hasReachedCompressionGoal(inputBuffer.length, bestSize) ||
+          (index > 0 && incrementalGain <= MIN_INCREMENTAL_GAIN_AFTER_FIRST)
+        ) {
+          await fs.rm(outputPath, { force: true }).catch(() => undefined);
+          break;
+        }
       }
       await fs.rm(outputPath, { force: true }).catch(() => undefined);
     }
@@ -302,7 +326,16 @@ async function compressPdfWithGhostscript(inputBuffer: Buffer): Promise<Buffer> 
   }
 }
 
-async function runGhostscriptPreset(presetArgs: string[], inputPath: string, outputPath: string) {
+type GhostscriptRunOptions = {
+  timeoutMs?: number;
+};
+
+async function runGhostscriptPreset(
+  presetArgs: string[],
+  inputPath: string,
+  outputPath: string,
+  options: GhostscriptRunOptions = {},
+) {
   const args = [
     "-sDEVICE=pdfwrite",
     "-dCompatibilityLevel=1.4",
@@ -314,8 +347,10 @@ async function runGhostscriptPreset(presetArgs: string[], inputPath: string, out
     inputPath,
   ];
 
+  const execOptions = options.timeoutMs ? { timeout: options.timeoutMs } : undefined;
+
   await new Promise<void>((resolve, reject) => {
-    execFile(GHOSTSCRIPT_BINARY, args, (error) => {
+    execFile(GHOSTSCRIPT_BINARY, args, execOptions, (error) => {
       if (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
           reject(new HttpError(500, `Ghostscript binary "${GHOSTSCRIPT_BINARY}" was not found. ${GHOSTSCRIPT_INSTALL_HELP}`));
@@ -327,6 +362,15 @@ async function runGhostscriptPreset(presetArgs: string[], inputPath: string, out
       }
     });
   });
+}
+
+function hasReachedCompressionGoal(originalSize: number, candidateSize: number): boolean {
+  if (candidateSize <= TARGET_COMPRESSED_SIZE_BYTES || originalSize === 0) {
+    return true;
+  }
+
+  const totalReduction = 1 - candidateSize / originalSize;
+  return totalReduction >= GOOD_COMPRESSION_THRESHOLD;
 }
 
 async function mergePdfFiles(files: Express.Multer.File[]): Promise<Uint8Array> {
