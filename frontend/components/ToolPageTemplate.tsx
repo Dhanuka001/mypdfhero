@@ -27,6 +27,9 @@ type UploadResult = {
   stats?: UploadStats;
 };
 
+const SAVED_INDICATOR_RADIUS = 54;
+const SAVED_INDICATOR_CIRCUMFERENCE = 2 * Math.PI * SAVED_INDICATOR_RADIUS;
+
 export function ToolPageTemplate({
   title,
   description,
@@ -44,10 +47,29 @@ export function ToolPageTemplate({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [targetProgress, setTargetProgress] = useState(0);
+  const [progress, setProgressState] = useState(0);
+  const [targetProgress, setTargetProgressState] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
+  const [savedPercentAnimated, setSavedPercentAnimated] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const progressRef = useRef(0);
+  const targetProgressRef = useRef(0);
+  const updateProgress = useCallback((value: number | ((prev: number) => number)) => {
+    if (typeof value === "function") {
+      setProgressState((prev) => {
+        const next = value(prev);
+        progressRef.current = next;
+        return next;
+      });
+    } else {
+      progressRef.current = value;
+      setProgressState(value);
+    }
+  }, []);
+  const updateTargetProgress = useCallback((value: number) => {
+    targetProgressRef.current = value;
+    setTargetProgressState(value);
+  }, []);
 
   const apiUrl = `${getApiBaseUrl()}${endpoint}`;
   const maxSizeLabel = "20MB";
@@ -61,26 +83,70 @@ export function ToolPageTemplate({
   }, [result]);
 
   useEffect(() => {
-    setShowResultModal(Boolean(result));
-    return () => {
-      setShowResultModal(false);
-    };
-  }, [result]);
-
-  useEffect(() => {
-    if (progress === targetProgress) return;
+    if (progress >= targetProgress) return;
     const interval = setInterval(() => {
-      setProgress((prev) => {
+      updateProgress((prev) => {
         if (prev >= targetProgress) {
           clearInterval(interval);
           return targetProgress;
         }
-        const next = prev + Math.max(1, (targetProgress - prev) * 0.1);
+        const next = prev + Math.max(1, (targetProgress - prev) * 0.15);
         return next > targetProgress ? targetProgress : next;
       });
-    }, 30);
+    }, 60);
     return () => clearInterval(interval);
-  }, [targetProgress, progress]);
+  }, [targetProgress, progress, updateProgress]);
+
+  const savedPercent = useMemo(() => {
+    if (!result?.stats) return null;
+    const { originalSize, compressedSize, reductionPercent } = result.stats;
+    if (originalSize > 0) {
+      const saved = ((originalSize - compressedSize) / originalSize) * 100;
+      return Math.max(0, Math.min(100, Math.round(saved)));
+    }
+    if (typeof reductionPercent === "number") {
+      return Math.max(0, Math.min(100, Math.round(reductionPercent)));
+    }
+    return null;
+  }, [result?.stats]);
+
+  useEffect(() => {
+    if (savedPercent === null) {
+      setSavedPercentAnimated(0);
+      return;
+    }
+    setSavedPercentAnimated(0);
+    const frame = requestAnimationFrame(() => {
+      setSavedPercentAnimated(savedPercent);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [savedPercent]);
+
+  useEffect(() => {
+    if (!result) {
+      setShowResultModal(false);
+      return;
+    }
+    if (isProcessing || progress < 100) return;
+    const timer = setTimeout(() => setShowResultModal(true), 150);
+    return () => clearTimeout(timer);
+  }, [result, isProcessing, progress]);
+
+  const waitForProgressCompletion = useCallback(() => {
+    if (targetProgressRef.current < 100 || progressRef.current >= 99.5) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      const tick = () => {
+        if (progressRef.current >= 99.5) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }, []);
 
   const addFiles = useCallback(
     (incoming: FileList | File[]) => {
@@ -100,11 +166,11 @@ export function ToolPageTemplate({
       setFiles(merged);
       setResult(null);
       setShowResultModal(false);
-      setProgress(0);
-      setTargetProgress(0);
+      updateProgress(0);
+      updateTargetProgress(0);
       setProgressMessage("");
     },
-    [accept, files, maxFiles, multiple],
+    [accept, files, maxFiles, multiple, updateProgress, updateTargetProgress],
   );
 
   const onDrop = useCallback(
@@ -137,8 +203,9 @@ export function ToolPageTemplate({
     }
     setIsProcessing(true);
     setError(null);
-    setTargetProgress(15);
-    setProgressMessage("Uploading files…");
+    updateProgress(0);
+    updateTargetProgress(15);
+    setProgressMessage("Processing PDF…");
 
     try {
       setShowResultModal(false);
@@ -151,8 +218,7 @@ export function ToolPageTemplate({
         method: "POST",
         body: formData,
       });
-      setTargetProgress(60);
-      setProgressMessage("Optimizing on server…");
+      updateTargetProgress(55);
 
       if (!response.ok) {
         const text = await response.text();
@@ -161,8 +227,7 @@ export function ToolPageTemplate({
       }
 
       const blob = await response.blob();
-      setTargetProgress(90);
-      setProgressMessage("Preparing download…");
+      updateTargetProgress(80);
       const statsHeader = response.headers.get("x-pdf-stats");
       let stats: UploadStats | undefined;
       if (statsHeader) {
@@ -178,19 +243,21 @@ export function ToolPageTemplate({
         fileName,
         stats,
       });
-      setTargetProgress(100);
-      setProgressMessage("Ready!");
+      updateTargetProgress(100);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
+      await waitForProgressCompletion();
+      await new Promise((resolve) => setTimeout(resolve, 150));
       setIsProcessing(false);
       setTimeout(() => {
-        setTargetProgress(0);
+        updateTargetProgress(0);
+        updateProgress(0);
         setProgressMessage("");
-      }, 600);
+      }, 800);
     }
-  }, [apiUrl, fieldName, files, title]);
+  }, [apiUrl, fieldName, files, title, updateProgress, updateTargetProgress, waitForProgressCompletion]);
 
   const removeFile = useCallback(
     (index: number) => {
@@ -204,10 +271,10 @@ export function ToolPageTemplate({
     setResult(null);
     setError(null);
     setShowResultModal(false);
-    setTargetProgress(0);
-    setProgress(0);
+    updateProgress(0);
+    updateTargetProgress(0);
     setProgressMessage("");
-  }, []);
+  }, [updateProgress, updateTargetProgress]);
 
   const dropzoneText = useMemo(() => {
     if (!files.length) {
@@ -225,13 +292,13 @@ export function ToolPageTemplate({
 
       <div className="relative rounded-[32px] border border-purple-100 bg-white p-6 shadow-xl md:p-8">
         {isProcessing && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[32px] bg-white/85 backdrop-blur">
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[32px] bg-white/90 backdrop-blur">
             <div className="w-full max-w-sm space-y-3 text-center">
-              <p className="text-sm font-semibold text-[#120529]">{progressMessage || "Processing…"}</p>
+              <p className="text-sm font-semibold text-[#120529]">{progressMessage || "Processing PDF…"}</p>
               <div className="h-2 w-full rounded-full bg-purple-100">
                 <div
-                  className="h-full rounded-full bg-[#7c3aed] transition-all"
-                  style={{ width: `${Math.max(10, progress)}%` }}
+                  className="h-full rounded-full bg-[#7c3aed] transition-[width] duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
@@ -343,7 +410,7 @@ export function ToolPageTemplate({
                 <h3 className="text-3xl font-semibold">Your PDF is lighter now.</h3>
                 <p className="text-sm text-[#4b3b63]">
                   {result.stats
-                    ? `You saved ${formatBytes(result.stats.originalSize - result.stats.compressedSize)} (${result.stats.reductionPercent}% smaller).`
+                    ? `You saved ${formatBytes(result.stats.originalSize - result.stats.compressedSize)} (${savedPercent ?? result.stats.reductionPercent}% smaller).`
                     : "Download it instantly or start another task."}
                 </p>
               </div>
@@ -357,10 +424,43 @@ export function ToolPageTemplate({
             </div>
             {result.stats && (
               <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div className="rounded-3xl border border-purple-50 bg-gradient-to-br from-[#f6f0ff] to-[#ffeefe] p-6 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#7c3aed]">Saved</p>
-                  <p className="text-5xl font-black text-[#0ba07f]">{result.stats.reductionPercent}%</p>
+                <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-purple-50 bg-gradient-to-br from-[#f6f0ff] to-[#ffeefe] p-6 text-center">
+                  <div className="relative h-40 w-40">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r={SAVED_INDICATOR_RADIUS}
+                        stroke="#e5dbff"
+                        strokeWidth="10"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r={SAVED_INDICATOR_RADIUS}
+                        stroke="#7c3aed"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        fill="transparent"
+                        strokeDasharray={SAVED_INDICATOR_CIRCUMFERENCE}
+                        style={{
+                          strokeDashoffset:
+                            SAVED_INDICATOR_CIRCUMFERENCE -
+                            (savedPercentAnimated / 100) * SAVED_INDICATOR_CIRCUMFERENCE,
+                          transition: "stroke-dashoffset 0.8s ease",
+                        }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[#120529]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#7c3aed]">You saved</p>
+                      <p className="text-4xl font-black">{savedPercent ?? result.stats.reductionPercent}%</p>
+                    </div>
+                  </div>
                   <p className="text-sm text-[#4b3b63]">
+                    Based on {formatBytes(result.stats.originalSize)} &rarr; {formatBytes(result.stats.compressedSize)}
+                  </p>
+                  <p className="text-xs font-semibold text-[#0ba07f]">
                     {formatBytes(result.stats.originalSize - result.stats.compressedSize)} lighter total
                   </p>
                 </div>

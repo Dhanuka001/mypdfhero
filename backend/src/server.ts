@@ -85,6 +85,10 @@ app.use(
     origin: FRONTEND_ORIGIN,
   }),
 );
+app.use((_req, res, next) => {
+  res.header("Access-Control-Expose-Headers", "X-PDF-Stats,Content-Disposition");
+  next();
+});
 app.use(express.json());
 
 /**
