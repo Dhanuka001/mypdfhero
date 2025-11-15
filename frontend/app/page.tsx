@@ -6,21 +6,18 @@ const tools = [
     description: "Shrink PDFs without killing quality. Perfect for email + uploads.",
     href: "/tools/compress-pdf",
     badge: "Smaller files",
-    gradient: "from-[#ede7ff] via-[#f7e3ff] to-[#fff7ee]",
   },
   {
     title: "Merge PDF",
     description: "Stack multiple PDFs into one tidy file in a single click.",
     href: "/tools/merge-pdf",
     badge: "Batch ready",
-    gradient: "from-[#f8e9ff] via-[#f1f4ff] to-[#e9fbff]",
   },
   {
     title: "JPG to PDF",
     description: "Convert scans or screenshots into a clean PDF packet.",
     href: "/tools/jpg-to-pdf",
     badge: "Photo friendly",
-    gradient: "from-[#ffeef4] via-[#fef6ff] to-[#ecf6ff]",
   },
 ];
 
@@ -152,19 +149,17 @@ export default function Home() {
             <Link
               key={tool.href}
               href={tool.href}
-              className={`group relative overflow-hidden rounded-3xl border border-transparent bg-gradient-to-br ${tool.gradient} p-1 shadow-lg transition hover:-translate-y-2 hover:shadow-2xl`}
+              className="group rounded-3xl border border-purple-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-purple-300"
             >
-              <div className="h-full rounded-[30px] border border-white/70 bg-white/95 p-6 shadow-sm transition group-hover:bg-white">
-                <span className="rounded-full bg-[#ede7ff] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#7c3aed]">
-                  {tool.badge}
-                </span>
-                <h3 className="mt-4 text-2xl font-semibold text-[#120529]">{tool.title}</h3>
-                <p className="mt-2 text-base text-[#4b3b63]">{tool.description}</p>
-                <span className="mt-6 inline-flex items-center text-sm font-semibold text-[#7c3aed]">
-                  Open tool
-                  <span className="ml-2 text-lg transition group-hover:translate-x-1">{">"}</span>
-                </span>
-              </div>
+              <span className="rounded-full bg-[#ede7ff] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#7c3aed]">
+                {tool.badge}
+              </span>
+              <h3 className="mt-4 text-2xl font-semibold text-[#120529]">{tool.title}</h3>
+              <p className="mt-2 text-base text-[#4b3b63]">{tool.description}</p>
+              <span className="mt-6 inline-flex items-center text-sm font-semibold text-[#7c3aed]">
+                Open tool
+                <span className="ml-2 text-lg transition group-hover:translate-x-1">{">"}</span>
+              </span>
             </Link>
           ))}
         </div>

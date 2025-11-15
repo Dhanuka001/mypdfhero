@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Josefin_Sans } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -11,10 +12,19 @@ const josefin = Josefin_Sans({
   variable: "--font-body",
 });
 
-export const metadata = buildMetadata({
+const baseMetadata = buildMetadata({
   title: "MyPDFHero | Free PDF Tools for Everyday Workflows",
   description: siteConfig.description,
 });
+
+export const metadata: Metadata = {
+  ...baseMetadata,
+  icons: {
+    icon: "/mypdfhero_logo.png",
+    shortcut: "/mypdfhero_logo.png",
+    apple: "/mypdfhero_logo.png",
+  },
+};
 
 export default function RootLayout({
   children,

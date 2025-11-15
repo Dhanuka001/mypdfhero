@@ -16,20 +16,22 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-20 border-b border-purple-100/80 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-8">
-        <Link
-          href="/"
-          className="flex items-center gap-2 md:gap-2.5"
-        >
-          <Image
-            src="/mypdfhero_logo.png"
-            alt="MyPDFHero logo"
-            width={90}
-            height={90}
-            className="h-16 w-16 md:h-10 md:w-10"
-          />
-          <span className="text-lg font-semibold tracking-tight text-[#120529] md:text-xl">
-            MyPDFHero
-          </span>
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl  md:w-11">
+            <Image
+              src="/mypdfhero_logo.png"
+              alt="MyPDFHero logo"
+              width={72}
+              height={72}
+              priority
+              sizes="48px"
+              className="h-9 w-9 md:h-8 md:w-8"
+            />
+          </div>
+          <div className="leading-tight">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-[#7c3aed]">MyPDFHero</span>
+            <span className="block text-base font-semibold text-[#120529] md:text-lg">PDF Workflow Suite</span>
+          </div>
         </Link>
 
         {/* Center Nav (desktop) */}
