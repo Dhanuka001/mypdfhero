@@ -14,12 +14,9 @@ export function Footer() {
           <Link href="/terms" className="hover:text-[#120529]">
             Terms
           </Link>
-          <a
-            href="mailto:hello@mypdfhero.com"
-            className="hover:text-[#120529]"
-          >
+          <Link href="/contact" className="hover:text-[#120529]">
             Contact
-          </a>
+          </Link>
         </div>
       </div>
     </footer>
