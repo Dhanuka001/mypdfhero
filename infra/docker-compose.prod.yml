@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   backend:
+    container_name: mypdfhero-backend
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -9,12 +10,14 @@ services:
       NODE_ENV: production
       PORT: 4000
       FRONTEND_ORIGIN: "https://mypdfhero.com"
-    ports:
-      - "4000:4000"
+    # Only needed inside Docker (Caddy will reach this via the network)
+    expose:
+      - "4000"
     networks:
       - web
 
   frontend:
+    container_name: mypdfhero-frontend
     build:
       context: ../frontend
       dockerfile: Dockerfile
@@ -23,11 +26,14 @@ services:
       NEXT_PUBLIC_API_URL: "https://mypdfhero.com"
     depends_on:
       - backend
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     networks:
       - web
 
 networks:
   web:
-    driver: bridge
+    external: true
+    # This is the network created by the corn infra compose:
+    # "corn-ecommerce_web"
+    name: corn-ecommerce_web
