@@ -20,9 +20,9 @@ const baseMetadata = buildMetadata({
 export const metadata: Metadata = {
   ...baseMetadata,
   icons: {
-    icon: "/mypdfhero_logo.png",
-    shortcut: "/mypdfhero_logo.png",
-    apple: "/mypdfhero_logo.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
